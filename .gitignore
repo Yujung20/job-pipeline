@@ -1,0 +1,10 @@
+# 환경변수 파일 (API 키 등 비밀 정보)
+airflow/.env
+
+# Airflow 로그
+airflow/logs/
+
+# Node 모듈
+node_modules/
+
+airflow/gitconfig
