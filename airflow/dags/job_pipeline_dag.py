@@ -23,7 +23,7 @@ with DAG(
     dag_id="job_pipeline",               # Airflow UI에서 보이는 이름
     default_args=default_args,
     description="채용 공고 자동 수집 → 분석 → 블로그 배포",
-    schedule_interval="0 1 * * *",       # 매일 10시 (한국시간 기준 설정 필요)
+    schedule_interval="0 0 * * *",       # 매일 10시 (한국시간 기준 설정 필요)
     start_date=datetime(2026, 6, 15),
     catchup=False,                       # 과거 날짜 소급 실행 안 함
     tags=["jobs", "pipeline"],
@@ -57,7 +57,7 @@ with DAG(
         task_id="collect_jobs",
         python_callable=task_collect_jobs,
         provide_context=True,
-        execution_timeout=timedelta(minutes=30),
+        execution_timeout=timedelta(minutes=60),
     )
 
     # ── Task 3: Claude 분석 ──────────────────────────────────────
@@ -82,7 +82,7 @@ with DAG(
         task_id="analyze_jobs",
         python_callable=task_analyze_jobs,
         provide_context=True,
-        execution_timeout=timedelta(minutes=30),
+        execution_timeout=timedelta(minutes=90),
     )
 
     # ── Task 4: git push ─────────────────────────────────────────

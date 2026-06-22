@@ -51,27 +51,34 @@ WANTED_KEYWORDS = [
     "AI", "LLM", "머신러닝", "데이터", "data", "ML", "Machine Learning", "RAG"
 ]
 
-# ── 회사 리스트 (슬러그 자동 추정) ────────────────────────────
+# ── Greenhouse / Lever 회사 리스트 ─────────────────────────────
 COMPANIES = [
-    "openai", "anthropic", "deepmind", "meta", "microsoft",
-    "amazon", "nvidia", "apple", "ibm", "intel",
-    "cohere", "mistral", "perplexity", "character-ai", "glean",
-    "scaleai", "databricks", "snowflake", "huggingface", "wandb",
-    "confluent", "mongodb", "elastic", "redis", "cockroachlabs",
-    "singlestore", "fivetran", "dbtlabs", "astronomer", "starburst",
-    "cloudflare", "digitalocean", "notion", "canva", "atlassian",
-    "hubspot", "salesforce", "servicenow", "workday", "stripe",
-    "block", "shopify", "sap", "oracle", "cisco",
-    "dell", "ericsson", "nokia", "siemens", "schneider-electric",
-    "asml", "applied-materials", "lam-research", "kla", "synopsys",
-    "cadence", "arm", "qualcomm", "broadcom", "iqvia",
-    "roche", "novartis", "pfizer", "astrazeneca", "jnj",
-    "abbvie", "gsk", "illumina", "tempus", "boeing",
-    "airbus", "ge", "amadeus", "sabre", "harvey",
-    "codeium", "abridge", "writer", "runway", "elevenlabs",
-    "synthesia", "lumaai", "coupang", "bytedance", "tiktok",
-    "booking", "agoda", "expedia", "grab", "shopee",
-    "sea", "rakuten"
+    # 🤖 AI 스타트업/스케일업
+    "openai", "anthropic", "cohere", "mistral", "perplexity",
+    "character-ai", "glean", "scaleai", "harvey", "codeium",
+    "abridge", "writer", "runway", "elevenlabs", "synthesia",
+    "lumaai", "huggingface", "deepmind", "bytedance", "tiktok",
+    # 🛠️ 개발자 도구 / MLOps
+    "wandb", "databricks", "astronomer", "cloudflare", "digitalocean",
+    "notion", "canva", "atlassian",
+    # 📊 데이터 인프라 중견
+    "snowflake", "confluent", "mongodb", "elastic", "redis",
+    "cockroachlabs", "fivetran", "dbtlabs", "starburst", "singlestore",
+    # 🌏 아시아 스케일업
+    "coupang", "grab", "shopee", "sea", "rakuten",
+    "booking", "agoda", "expedia",
+    # 🏢 기타 유망 중견
+    "hubspot", "stripe", "block", "shopify",
+]
+
+# ── Ashby 전용 회사 리스트 (슬러그 대소문자 주의) ──────────────
+ASHBY_COMPANIES = [
+    "OpenAI", "Anthropic", "Figma", "Linear", "Cursor",
+    "Vercel", "Perplexity", "Notion", "Ramp", "Brex",
+    "scale-ai", "Reddit", "Shopify", "Plaid", "Airtable",
+    "Retool", "Supabase", "PostHog", "Replit", "Mercury",
+    "Cohere", "Zapier", "Harvey", "Render", "Docker",
+    "Benchling", "WorkOS", "Confluent", "Airwallex", "Crusoe"
 ]
 
 
@@ -99,7 +106,7 @@ def fetch_greenhouse(company_slug: str) -> list:
         for job in jobs:
             title = job.get("title", "")
             if is_data_role(title):
-                
+
                 # ── 상세 API 호출해서 description 가져오기 ──
                 job_id = job.get("id")
                 description = ""
@@ -109,14 +116,13 @@ def fetch_greenhouse(company_slug: str) -> list:
                         detail_res = requests.get(detail_url, timeout=10)
                         if detail_res.status_code == 200:
                             detail = detail_res.json()
-                            # HTML 태그 제거해서 plain text로
                             raw = detail.get("content", "")
-                            raw = html.unescape(raw)          # &lt;p&gt; → <p> 로 변환
-                            description = re.sub(r'<[^>]+>', ' ', raw)  # <p> 태그 제거
-                            description = re.sub(r'\s+', ' ', description).strip()[:1000]  # 공백 정리
+                            raw = html.unescape(raw)
+                            description = re.sub(r'<[^>]+>', ' ', raw)
+                            description = re.sub(r'\s+', ' ', description).strip()[:1000]
                     except Exception:
                         pass
-                    time.sleep(0.2)  # 상세 API도 과호출 방지
+                    time.sleep(0.2)
 
                 result.append({
                     "source": "greenhouse",
@@ -136,10 +142,6 @@ def fetch_greenhouse(company_slug: str) -> list:
 
 # ── Lever ──────────────────────────────────────────────────────
 def fetch_lever(company_slug: str) -> list:
-    """
-    Lever API로 특정 회사의 데이터 직군 공고를 가져옴
-    https://api.lever.co/v0/postings/{slug}?mode=json
-    """
     url = f"https://api.lever.co/v0/postings/{company_slug}?mode=json"
     try:
         res = requests.get(url, timeout=10)
@@ -172,10 +174,6 @@ def fetch_lever(company_slug: str) -> list:
 
 # ── Ashby ──────────────────────────────────────────────────────
 def fetch_ashby(company_slug: str) -> list:
-    """
-    Ashby API로 특정 회사의 데이터 직군 공고를 가져옴
-    https://api.ashbyhq.com/posting-api/job-board/{slug}
-    """
     url = f"https://api.ashbyhq.com/posting-api/job-board/{company_slug}"
     try:
         res = requests.get(url, timeout=10)
@@ -202,6 +200,7 @@ def fetch_ashby(company_slug: str) -> list:
         print(f"[Ashby] {company_slug} 오류: {e}")
         return []
 
+
 # ── Wanted ─────────────────────────────────────────────────────
 def fetch_wanted() -> list:
     result = []
@@ -218,16 +217,13 @@ def fetch_wanted() -> list:
             for job in jobs:
                 job_id = job.get("id")
 
-                # 중복 공고 스킵
                 if job_id in seen_ids:
                     continue
                 seen_ids.add(job_id)
 
-                # 데이터 직군 필터 먼저 적용 (제목만 보고 판단)
                 if not is_data_role(job.get("position", "")):
                     continue
 
-                # 필터 통과한 공고만 상세 API 호출
                 detail_url = f"https://www.wanted.co.kr/api/v4/jobs/{job_id}"
                 try:
                     detail_res = requests.get(detail_url, timeout=10, headers={"Accept": "application/json"})
@@ -257,12 +253,12 @@ def fetch_wanted() -> list:
                     "description": description
                 })
 
-                time.sleep(2)  # 상세 API 호출 간격
+                time.sleep(2)
 
         except Exception as e:
             print(f"[Wanted] '{keyword}' 키워드 오류: {e}")
 
-        time.sleep(2)  # 키워드 간 요청 간격
+        time.sleep(2)
 
     print(f"[Wanted] 총 {len(result)}개 공고 수집")
     return result
@@ -287,7 +283,10 @@ def collect_all_jobs(run_id: str = None) -> list:
         jobs_skipped = 0
         jobs_failed = 0
 
-        for company in COMPANIES:
+        # ✅ 변경: Ashby는 전용 리스트, 나머지는 기존 COMPANIES 사용
+        company_list = ASHBY_COMPANIES if source_name == "ashby" else COMPANIES
+
+        for company in company_list:
             companies_tried += 1
             try:
                 jobs = fetch_fn(company)
@@ -374,10 +373,11 @@ def collect_all_jobs(run_id: str = None) -> list:
     print(f"\n✅ 총 {len(all_jobs)}개 데이터 직군 공고 수집 완료")
     return all_jobs
 
+
 # ── 테스트 실행 ────────────────────────────────────────────────
 if __name__ == "__main__":
     jobs = collect_all_jobs()
-    for job in jobs[:5]:  # 처음 5개만 출력
+    for job in jobs[:5]:
         print(f"\n[{job['source'].upper()}] {job['company']}")
         print(f"  제목: {job['title']}")
         print(f"  위치: {job['location']}")

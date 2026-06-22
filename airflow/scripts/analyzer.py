@@ -108,6 +108,13 @@ location: "{job['location']}"
 source: "{job['source']}"
 link: "{job['url']}"
 ---
+ 
+## 링크
+ 
+{job['url']}
+ 
+
+---
 
 ## 원문
 
