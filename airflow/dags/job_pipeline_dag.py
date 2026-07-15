@@ -89,26 +89,41 @@ with DAG(
     def task_git_push():
 
         pat = os.environ.get("GITHUB_PAT")
-        
+
+        blog_path = "/opt/airflow/blog"
+        remote_url = f"https://{pat}@github.com/yujung20/yujung20.github.io.git"
+
+        # 원격 최신 정보 받아오기 (비교 정확도를 위해 먼저 실행)
+        subprocess.run(["git", "fetch", remote_url, "main"], cwd=blog_path, check=True)
+
+        # 1) 커밋 안 된 변경사항이 있는지 확인
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=blog_path, capture_output=True, text=True
+        )
+        has_uncommitted = bool(status.stdout.strip())
+
+        # 2) 커밋은 됐지만 원격에 안 올라간(push 안 된) 것이 있는지 확인
+        unpushed = subprocess.run(
+            ["git", "log", "FETCH_HEAD..HEAD", "--oneline"],
+            cwd=blog_path, capture_output=True, text=True
+        )
+        has_unpushed = bool(unpushed.stdout.strip())
+
+        if not has_uncommitted and not has_unpushed:
+            print("ℹ️ 변경사항 없음, push 생략")
+            return
+
+        if has_unpushed:
+            print(f"ℹ️ 이전에 커밋되었지만 push 안 된 커밋 발견:\n{unpushed.stdout}")
+
         try:
-            blog_path = "/opt/airflow/blog"
-            remote_url = f"https://{pat}@github.com/yujung20/yujung20.github.io.git"
-            
-            # 변경사항 확인
-            status = subprocess.run(
-                ["git", "status", "--porcelain"],
-                cwd=blog_path, capture_output=True, text=True
-            )
-            
-            if not status.stdout.strip():
-                print("ℹ️ 변경사항 없음, push 생략")
-                return
-            
-            subprocess.run(["git", "add", "."], cwd=blog_path, check=True)
-            subprocess.run(
-                ["git", "commit", "-m", f"자동 업데이트: {datetime.now().strftime('%Y-%m-%d')}"],
-                cwd=blog_path, check=True
-            )
+            if has_uncommitted:
+                subprocess.run(["git", "add", "."], cwd=blog_path, check=True)
+                subprocess.run(
+                    ["git", "commit", "-m", f"자동 업데이트: {datetime.now().strftime('%Y-%m-%d')}"],
+                    cwd=blog_path, check=True
+                )
             subprocess.run(
                 ["git", "push", remote_url, "main"],
                 cwd=blog_path, check=True
@@ -116,6 +131,8 @@ with DAG(
             print("✅ git push 완료")
         except subprocess.CalledProcessError as e:
             print(f"⚠️ git push 오류: {e}")
+            raise
+        
 
     t4 = PythonOperator(
         task_id="git_push",
