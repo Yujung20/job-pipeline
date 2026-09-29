@@ -74,7 +74,7 @@ and published to the same blog.
 
 ```
 [Manual]                                    [Automated]
-채용 공고 텍스트 복사                       Airflow DAG (매일 9:00 AM KST)
+채용 공고 텍스트 복사                       Airflow DAG (매주 화요일 9:00 AM ET)
    │                                            │
    ▼                                            ▼
 node analyze.js 실행                  ┌─────────────────────────────┐
@@ -108,7 +108,7 @@ node analyze.js 실행                  ┌────────────�
 
 ```
 [Manual]                                    [Automated]
-Copy job posting text                  Airflow DAG (daily, 9:00 AM KST)
+Copy job posting text                  Airflow DAG (every Tuesday, 9:00 AM ET)
    │                                            │
    ▼                                            ▼
 Run node analyze.js                   ┌───────────────────────────────┐
@@ -140,15 +140,17 @@ Run node analyze.js                   ┌─────────────
 
 ## ✨ Main Features
 
-### ⏰ Airflow DAG 자동 스케줄링
+### ⏰ Airflow DAG 자동 스케줄링 - 데이터 기반 스케줄 재설계 
 
-- 매일 **9:00 AM KST** (`0 0 * * *` UTC)에 DAG가 자동으로 트리거되어 별도 개입 없이 파이프라인이 실행됨
-- `catchup=False` 설정으로 과거 미실행 구간을 한꺼번에 몰아서 실행하지 않도록 방지
-- 작업 실패 시 **2회 재시도, 10분 간격**으로 재실행
-- `execution_timeout`은 오래 걸리는 작업(`collect_jobs`, `analyze_jobs`)에만 적용하여, 무한 대기로 인한 파이프라인 전체 정지를 방지
+- 초기에는 **매일 오전 9시(KST)**에 파이프라인이 실행되도록 설계했습니다.
+- 이후 실제 수집 데이터를 분석한 결과, 한국시간 기준 화요일(아시아권 기업의 월요일자 공고가 반영됨)과 수요일(시차로 인해 하루 늦게 반영되는 미주권 화요일자 공고)에 신규 공고가 가장 많이 몰린다는 것을 확인했습니다.
+- 이후 캐나다로 실거주지를 옮기면서, 매주 화요일 오전 9시(미국 동부시간, Eastern Time)에 실행하도록 스케줄을 재설계했고, 서머타임(DST) 전환을 자동으로 반영하기 위해 pendulum 라이브러리를 도입했습니다.
+- catchup=False 설정으로 과거 미실행 구간을 한꺼번에 몰아서 실행하지 않도록 방지
+- 작업 실패 시 2회 재시도, 10분 간격으로 재실행
+- execution_timeout은 오래 걸리는 작업(collect_jobs, analyze_jobs)에만 적용하여, 무한 대기로 인한 파이프라인 전체 정지를 방지
 
 **(ENG)**  
-The DAG is automatically triggered every day at 9:00 AM KST without manual intervention. `catchup=False` prevents backfilling missed runs, and failed tasks retry twice with a 10-minute delay. `execution_timeout` is applied only to long-running tasks (`collect_jobs`, `analyze_jobs`) to avoid stalling the entire pipeline on a single hang.
+Initially, the pipeline was scheduled to run daily at 9:00 AM (KST). After analyzing the actual collection data, new postings were found to peak on Tuesdays (Korea time) — reflecting Monday postings from Asia-based companies — and on Wednesdays, reflecting Tuesday postings from US-based companies delayed by the time difference. After relocating to Canada, the schedule was redesigned to run every Tuesday at 9:00 AM Eastern Time (ET), and the pendulum library was adopted to automatically handle daylight saving time (DST) transitions. catchup=False prevents backfilling missed runs, and failed tasks retry twice with a 10-minute delay. execution_timeout is applied only to long-running tasks (collect_jobs, analyze_jobs) to avoid stalling the entire pipeline on a single hang.
 
 ---
 
@@ -203,18 +205,21 @@ Each collected job posting is sent to the Claude API to extract four structured 
 
 Wanted가 266건(53.8%)으로 가장 높았고, Greenhouse가 206건(41.7%)으로 이어져, 두 플랫폼이 전체 신규 공고 수집의 약 95%를 차지함을 확인했습니다.
 
-**3. 요일별 등록 패턴**
+**3. 요일별 등록 패턴 - 시차 효과 반**
 
-화요일에 신규 공고 등록이 가장 활발했고, 주말에는 등록이 급감하는 패턴을 확인했습니다. 일요일에 `job_postings`에 행이 없는 것은 버그가 아니라, 그날 신규 공고가 0건이라 `GROUP BY` 자체에 행이 잡히지 않은 정상적인 현상임을 직접 검증했습니다.
+화요일부터 토요일(한국시간 기준)까지 신규 공고 등록 건수가 비슷하게 높게 유지되었고, 월요일과 일요일에만 뚜렷하게 낮았습니다. 이는 시차 효과로 설명됩니다 — 한국시간 기준 토요일은 시차상 해외(특히 미주권)에서는 아직 금요일(평일)에 해당하여 해외 기업의 공고가 계속 반영되었고, 반대로 한국시간 일요일은 해외 기준 토요일(주말)에 해당하여 신규 공고가 0건으로 나타났습니다.
 
 > 📝 위 요일별 패턴은 운영 초기 데이터를 기준으로 한 잠정적 관찰이며, 데이터가 누적될수록 더 정교하게 검증·보완될 예정입니다.
 
 **요약**
 
-> 파이프라인 운영 데이터 분석 결과, Wanted(53.8%)와 Greenhouse(41.7%)가 신규 공고 수집의 약 95%를 차지했으며, 화요일에 신규 공고 등록이 가장 활발하고 주말에는 거의 등록이 없는 패턴을 확인함.
+> 파이프라인 운영 데이터 분석 결과, Wanted(53.8%)와 Greenhouse(41.7%)가 신규 공고 수집의 약 95%를 차지했으며, 화요일부터 토요일까지 신규 공고 등록이 활발했고 월요일과 일요일에만 등록이 급감하는 패턴(시차 효과)을 확인함.
 
 **(ENG)**  
-Using SQL on the `pipeline_runs` and `job_postings` tables from early operational data, three key insights were found: (1) the metric `jobs_saved` measures daily new-identification within a run, not the same thing as permanent storage count in `job_postings` — so "89.7% save rate" actually means "new-identification rate among collection attempts"; (2) Wanted (53.8%) and Greenhouse (41.7%) together account for roughly 95% of newly stored postings; (3) Tuesdays showed the highest posting activity, with activity dropping sharply on weekends — confirmed that the missing Sunday row wasn't a bug, but a `GROUP BY` artifact of zero new postings that day. These weekday patterns are early observations and will be validated further as more data accumulates.
+Using SQL on the `pipeline_runs` and `job_postings` tables from early operational data, three key insights were found: 
+(1) the metric jobs_saved measures daily new-identification within a run, not the same thing as permanent storage count in job_postings — so "89.7% save rate" actually means "new-identification rate among collection attempts"; 
+(2) Wanted (53.8%) and Greenhouse (41.7%) together account for roughly 95% of newly stored postings; 
+(3) new posting counts stayed similarly high from Tuesday through Saturday (Korea time), dropping noticeably only on Monday and Sunday. This is explained by the time difference: Saturday in Korea time still corresponds to Friday (a weekday) overseas — especially in North America — so postings from overseas companies kept coming in, while Sunday in Korea time corresponds to Saturday (a weekend day) overseas, which is why new postings dropped to zero that day.
 
 ---
 
@@ -277,3 +282,34 @@ job-pipeline/
 - Designing prompts for the Claude API to extract structured information (keywords, summary, requirements, recommended candidates) from unstructured job posting text
 - Performing SQL-based analysis of operational data and validating consistency between metrics
 - Taking a practical approach to running an automated pipeline alongside an existing manual tool during gradual transition
+
+📊 운영 중 발견한 문제와 개선
+ 
+파이프라인을 실제로 운영하면서 겉으로는 드러나지 않던 문제들을 데이터 분석과 코드 점검을 통해 발견하고 하나씩 해결했습니다.
+ 
+1. 지표 정합성 문제 — 33배 차이의 원인 규명
+파이프라인 로그(pipeline_runs.jobs_saved)와 실제 저장된 공고 수(job_postings 테이블) 사이에 약 33배에 달하는 큰 차이가 있어 원인을 분석했습니다. 15일간(60회 실행) 총 7,909건의 공고가 발견되었고 이 중 90.2%(7,136건)가 "그날 실행 기준 신규"로 식별되었지만, 실제로 DB에 영구 저장된 건 218건(전체 발견 건수의 2.76%)에 불과했습니다. 원인을 추적한 결과, jobs_saved는 회사명+제목 기준으로 매일 초기화되는 메모리 내 중복 체크였고, 실제 저장 여부는 URL 기준으로 DB 전체 이력과 비교하는 완전히 다른 기준이었기 때문임을 확인했습니다. 이후 "저장률"이라는 표현 대신 "신규 식별률"로 지표 설명을 정정했습니다.
+ 
+2. 모니터링 사각지대 발견
+운영 데이터를 점검하던 중, pipeline_runs 테이블의 status 필드가 실제 실행 결과와 무관하게 코드상 항상 "success"로 고정되어 있다는 것을 발견했습니다. 이 때문에 API가 조용히 실패해서 결과가 0건이 나온 경우와, 정상적으로 실행됐지만 마침 신규 공고가 없었던 경우를 로그만으로는 구분할 수 없다는 모니터링 사각지대를 확인했습니다. (향후 개선 과제로 기록)
+ 
+3. 플랫폼별 처리 속도 차이 원인 분석
+플랫폼별 평균 처리 시간을 비교한 결과 Wanted(약 490초)와 Ashby(약 46초) 사이에 약 10배의 속도 차이가 있었습니다. 코드를 확인한 결과, Wanted는 API 요청 제한(rate limit)을 피하기 위한 time.sleep() 지연이 포함되어 있었고, Greenhouse는 공고 하나하나마다 상세 정보를 별도 API로 추가 호출하는 구조였던 반면, Lever와 Ashby는 목록 조회 API에 이미 상세 설명이 포함되어 있어 추가 호출이 필요 없었기 때문임을 확인했습니다.
+ 
+4. Git 자동 푸시 안정화
+Git 자동 푸시 기능을 운영하며 세 가지 문제를 순차적으로 해결했습니다. 첫째, GitHub PAT(개인 액세스 토큰)가 만료되어 푸시가 실패하는 문제를 만료 기한 없는 토큰으로 재발급하여 해결했습니다. 둘째, 기존 코드는 예외(exception)가 발생해도 무시하고 넘어가는 구조였는데, raise를 추가해 Airflow가 실패를 정확히 실패로 인식하고 재시도하도록 수정했습니다. 셋째, 기존 로직은 "커밋되지 않은 변경사항"만 감지했는데, "커밋은 됐지만 아직 푸시되지 않은" 상태는 놓치는 사각지대가 있어, git fetch 후 git log로 원격 저장소와 비교하는 로직을 추가해 이 상태까지 감지하도록 보강했습니다.
+ 
+(ENG)
+While operating the pipeline day to day, several problems that weren't visible on the surface were uncovered through data analysis and code review, and resolved one by one.
+ 
+1. Metric Consistency Issue — Root Cause of a 33x Gap
+A large ~33x gap was found between the pipeline log metric (pipeline_runs.jobs_saved) and the actual number of stored postings (job_postings table), prompting a root-cause analysis. Over 15 days (60 runs), 7,909 total postings were discovered, of which 90.2% (7,136) were identified as "new within that day's run," but only 218 (2.76% of total discoveries) were ever permanently stored in the DB. Tracing the cause revealed that jobs_saved was an in-memory duplicate check keyed by company+title that reset daily, while actual storage was checked against the full DB history keyed by URL — two fundamentally different measurements. The metric description was subsequently corrected from "save rate" to "new-identification rate."
+ 
+2. Monitoring Blind Spot
+While reviewing operational data, it was discovered that the status field in the pipeline_runs table was hardcoded to "success" in the code regardless of the actual run outcome. This created a monitoring blind spot: a silent API failure resulting in zero postings could not be distinguished from a normal run that simply found no new postings that day. (Logged as a future improvement item.)
+ 
+3. Root Cause of Platform Processing Speed Differences
+Comparing average processing time per platform revealed roughly a 10x gap between Wanted (~490s) and Ashby (~46s). Code review showed Wanted included time.sleep() delays to respect API rate limits, Greenhouse made an extra detail-lookup API call for every individual posting, while Lever and Ashby already included full descriptions in their list-fetch APIs, requiring no additional calls.
+ 
+4. Stabilizing Automated Git Push
+Three issues with the automated Git push feature were resolved in sequence. First, push failures caused by an expired GitHub PAT (personal access token) were fixed by reissuing a token with no expiration. Second, the original code silently swallowed exceptions; adding raise ensured Airflow correctly recognized and retried genuine failures. Third, the original logic only detected "uncommitted changes," missing the case of changes that were committed but not yet pushed — this was fixed by adding a check that runs git fetch and compares against git log to detect that state as well.
