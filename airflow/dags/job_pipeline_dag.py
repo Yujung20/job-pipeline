@@ -24,7 +24,7 @@ with DAG(
     dag_id="job_pipeline",               # Airflow UI에서 보이는 이름
     default_args=default_args,
     description="채용 공고 자동 수집 → 분석 → 블로그 배포",
-    schedule_interval="0 8 * * 2",       
+    schedule_interval="0 7 * * *",       
     start_date=pendulum.datetime(2026, 6, 15, tz="America/Toronto"),  # DAG 시작 날짜
     catchup=False,                       # 과거 날짜 소급 실행 안 함
     tags=["jobs", "pipeline"],
