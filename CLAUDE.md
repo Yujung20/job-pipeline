@@ -17,8 +17,11 @@
 
 ## 비밀 파일 위치
 
-비밀 파일(`.env`, `credentials.json`, `token.json`, 레쥬메, DB 백업)은 저장소 **밖** `/mnt/d/project/secrets/job-pipeline/` 에 보관한다.
-저장소 안으로 복사하지 않는다.
+비밀 파일(`credentials.json`, `token.json`, 레쥬메)은 저장소 **밖** `/mnt/d/project/secrets/job-pipeline/` 에 보관한다.
+`.env`는 docker compose가 읽는 `airflow/.env` 하나만 쓴다. 저장소 안에 있지만 .gitignore로 제외된다. 다른 곳에 .env를 새로 만들지 않는다.
+DB 백업은 저장소 **밖** `/mnt/d/project/backups/job-pipeline/` 에 보관한다.
+비밀 파일(secrets)과 데이터 백업(backups)은 폴더를 나눠 보관한다.
+secrets·backups 폴더의 파일은 저장소 안으로 복사하지 않는다.
 
 ---
 

@@ -312,7 +312,8 @@ pipeline_runs ─> alert_emails, match_scores (어느 실행에서 생긴 기록
 1. Git 태그로 1기 시점 표시 — 파이프라인 저장소와 블로그 저장소 **둘 다**
 2. `pg_dump`로 1기 표 2개 백업 파일 생성 (저장소 밖 보관)
 3. `jobs` DB에 스키마 `archive_v1` 생성 후 `job_postings`, `pipeline_runs` 복사
-4. 줄 수 확인: `job_postings` **1,821**, `pipeline_runs` **164**
+4. 줄 수 확인: `job_postings` **1,946**, `pipeline_runs` **165**
+   - 10/20 1기 실행으로 125줄·1줄이 늘어 문서 작성 시점(1,821 / 164)과 달라짐
 5. `airflow` DB의 원래 표는 바로 지우지 않는다. 2기가 안정적으로 돌아간 뒤 삭제 여부 결정
 
 - 아카이브 데이터는 **수정하지 않는다** (시간대 변환 포함). 이력서에 쓴 1기 확정 수치의 근거이기 때문이다.
@@ -328,6 +329,16 @@ pipeline_runs ─> alert_emails, match_scores (어느 실행에서 생긴 기록
 | `job_postings.collected_at` 등 | `TIMESTAMP`(시간대 없음). 컨테이너 기본 시간대 기준으로 추정되나 확인되지 않음 |
 | 중복 기준 | DB는 URL, 블로그는 회사+직무명 앞 40자 — 기준이 두 가지였음 |
 | `pipeline_runs.status` | 실제 결과와 무관하게 `"success"`로 고정 기록됨 |
+
+### 아카이브 완료 기록 (2026-10-25)
+
+- 1. Git 태그: v1.0 — 파이프라인 21baaef, 블로그 1d5f623 (4-0에서 완료)
+- 2. 백업: pg_dump -Fc, 저장소 밖 보관, 복구 시험 통과
+- 3. 복사: 백업 파일을 jobs DB에 복구 후 archive_v1로 이동 (시퀀스·제약조건 함께 이동 확인)
+- 4. 확인: job_postings 1,946줄 / pipeline_runs 165줄, 원본과 내용 지문(md5) 전체 일치, 번호 장치 값 일치
+- 권한: 2기 계정 jobs_app은 archive_v1을 읽기만 가능 (수정·삭제·추가 시험에서 모두 거부됨)
+- jobs_app은 jobs DB에만 접속 가능 (airflow·postgres DB 접속 거부 확인)
+- 원래 표(airflow DB)는 그대로 유지
 
 ---
 
